@@ -1,10 +1,17 @@
+const MiniCssExtractPlugin = require("mini-css-extract-plugin");
+
 module.exports = {
+  plugins: [new MiniCssExtractPlugin()],
   module: {
     rules: [
       {
-        test: /\.svg$/,
-        use: ['vue-loader', '@svgv/webpack']
-      }
-    ]
+        test: /\.css$/i,
+        use: [MiniCssExtractPlugin.loader, "css-loader"],
+      },
+    ],
+  },
+  output: {
+    filename: "js/[name].js",
+    chunkFilename: "js/[name].js",
   }
-}
+};

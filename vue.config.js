@@ -1,17 +1,8 @@
 //const CompressionWebpackPlugin = require('compression-webpack-plugin');
 
 module.exports = {
-  /*devServer: {
-    proxy: {
-        '/api': {
-            target: 'http://192.168.4.1:80/',
-            changeOrigin: true,
-            ws: true
-        }
-    }
-  },*/
   productionSourceMap: false,
-  filenameHashing: false,
+  /*filenameHashing: false,
   css: {
     extract: false,
   },
@@ -22,16 +13,14 @@ module.exports = {
     output: {
       filename: "js/[name].js",
       chunkFilename: "js/[name].js",
+    }
+  },*/
+  configureWebpack: {
+    optimization: {
+      splitChunks: {
+        minSize: 10000,
+        maxSize: 250000,
+      },
     },
-    plugins: [
-      /*new CompressionWebpackPlugin({
-                filename: '[path][base].gz',
-                test: /\.js(\?.*)?$/i,
-                algorithm: 'gzip',
-                threshold: 10240,
-                minRatio: 0.8,
-                deleteOriginalAssets: false
-            })*/
-    ],
   },
 };

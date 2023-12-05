@@ -11,81 +11,90 @@
               <h1><span class="black--text">{{ elevation }}&deg;</span></h1>
               <span class="grey--text">Элевация</span>
               <br>
-              <h1><span class="black--text">{{ battery }} B</span></h1>
-              <span class="grey--text">Напряжение батареи</span>
+              <!--<h1><span class="black--text">{{ battery }} B</span></h1>
+              <span class="grey--text">Напряжение на батарее</span>
+              <br>-->
+              <h1><span class="black--text">{{ temp }} *С</span></h1>
+              <span class="grey--text">Температура камня</span>
               <br>
               <h3><span class="black--text">{{ setted_azimut }}&deg; {{ setted_elevation }}&deg;</span></h3>
               <span class="grey--text">Заданные значения</span>
               <br>
-
+              <span class="red--text" v-if="delta_enabled">Задан относительный угол</span>
+              <br v-if="delta_enabled">
             </div>
           </v-card-title>
         </v-card>
       </v-flex>
     </v-layout>
 
-    <v-snackbar v-model="alert_axes" :timeout="0"  color="red accent-2">
-      Мотор, походу, не доехал до конца
-      <!--<template>
-        <v-btn color="red" text @click="alert_axes = false; alerting_done = true;">
-          Закрыть
-        </v-btn>
-      </template>-->
+    <v-snackbar v-model="alert_axes" :timeout="0" color="red accent-2">
+      Мотор не доехал до конца: {{ motors }}
+    </v-snackbar>
+    <v-snackbar v-model="no_eth" :timeout="0" color="red accent-2">
+      Нет подключения
+
     </v-snackbar>
   </div>
 </template>
 
 <script>
 import { bus } from '@/event-bus'
-
 export default {
   name: 'RotatorMain',
+  props: ["joy_opened"],
   data() {
     return {
       azimut: 0,
       elevation: 0,
-      battery: 0,
+      //battery: 0,
       ws: null,
       prev_azimut: 0,
       setted_azimut: 0,
       prev_elevation: 0,
       setted_elevation: 0,
       alert_axes: false,
-      alerting_done: false,
-      alert_times: 0,
+      motors: "",
+      alert_x: false,
+      alert_y: false,
+      delta_enabled: 0,
+      is_ready: 1,
+      dorotate_enabled: null,
+      no_eth: 0,
+      temp:0
+    }
+  },
+  watch: {
+    is_ready(val) {
+      bus.$emit('is_ready', val)
     }
   },
   created() {
-    /*bus.$on('return_data_angles', (data) => {
-      this.setted_azimut = data.azimut
-      this.setted_elevation = data.elevation
-    })*/
-    /*this.ws = new WebSocket(`ws://${window.location.hostname}/ws`) // `ws://localhost:2000/`
-    this.ws.onopen = function () {
-      // eslint-disable-next-line
-      console.log('WS подключен')
+    const interval_id = window.setInterval(function () { }, Number.MAX_SAFE_INTEGER);
+    for (let i = 1; i < interval_id; i++) {
+      window.clearInterval(i);
     }
-    this.ws.onclose = function (eventclose) {
-      // eslint-disable-next-line
-      console.log('Cоеденение закрыто: ')
-      // eslint-disable-next-line
-      console.log(eventclose)
-    }
-    this.ws.onmessage = function (msg) {
-      var response = JSON.parse(msg.data)
-      this.battery = response.voltage.toFixed(2); this.azimut = response.azimut.toFixed(2); this.elevation = response.elevation.toFixed(2)
-    }.bind(this)
-    bus.$on('send_ws', (mess) => { this.ws.send(mess) })*/
     setInterval(() => {
-      this.$ajax.get(`/api/v1/data/get/angles`).then((response) => {
-        this.battery = response.data.voltage.toFixed(2);
-        this.azimut = response.data.azimut.toFixed(3);
-        this.elevation = response.data.elevation.toFixed(2);
-        this.setted_azimut = response.data.setted_azimut.toFixed(3);
-        this.setted_elevation = response.data.setted_elevation.toFixed(3);
-      });
+      if (!this.joy_opened) {
+        this.$ajax.get(`/api/v1/data/get/angles`).then((response) => {
+          //this.battery = response.data.voltage.toFixed(2);
+          this.azimut = response.data.azimut.toFixed(5);
+          this.elevation = response.data.elevation.toFixed(5);
+          this.setted_azimut = response.data.setted_azimut.toFixed(3);
+          this.setted_elevation = response.data.setted_elevation.toFixed(3);
+          this.delta_enabled = response.data.delta_enabled;
+          this.is_ready = response.data.is_ready;
+          this.temp = response.data.temp.toFixed(3);
+          this.dorotate_enabled = response.data.dorotate_enabled;
+          bus.$emit('dorotate_enabled', this.dorotate_enabled)
+          this.no_eth = false;
+          this.check_angles();
+        }).catch(error => { // eslint-disable-next-line
+          console.log(error);
+          this.no_eth = true;
+        });
+      }
     }, 1000);
-    setInterval(() => { this.check_angles() }, 1000);
   },
 
   methods: {
@@ -96,23 +105,42 @@ export default {
         })
     },
     check_angles() {
-      bus.$emit('get_data_angles')
-
+      //bus.$emit('get_data_angles')
       if (Math.abs(this.prev_azimut - this.azimut) < 1) {
         if (Math.abs(this.azimut - this.setted_azimut) > 2) {
-          if (/*this.alerting_done == false && */this.alert_times != 0) {
-            this.alert_axes = true;
-          }
-          this.alert_times += 1
+          this.alert_x = true;
         }
         else {
-          this.alert_times = 0
-          this.alerting_done = false;
-          this.alert_axes = false;
+          this.alert_x = false;
         }
       }
 
+      if (Math.abs(this.prev_elevation - this.elevation) < 1) {
+        if (Math.abs(this.elevation - this.setted_elevation) > 2) {
+          this.alert_y = true;
+        }
+        else {
+          this.alert_y = false;
+        }
+      }
       this.prev_azimut = this.azimut
+      this.prev_elevation = this.elevation
+      if (this.alert_y + this.alert_x > 0) {
+        this.alert_axes = true;
+        this.motors = ""
+        if (this.alert_x) {
+          this.motors += "X"
+        }
+        if (this.alert_x & this.alert_y) {
+          this.motors += " и "
+        }
+        if (this.alert_y) {
+          this.motors += "Y"
+        }
+      }
+      else {
+        this.alert_axes = false;
+      }
 
     }
   }
